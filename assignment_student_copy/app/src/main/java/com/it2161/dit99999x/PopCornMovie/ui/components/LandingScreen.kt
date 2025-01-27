@@ -39,12 +39,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 import com.it2161.dit99999x.PopCornMovie.MovieRaterApplication as MovieRaterApp
 
 
 @Composable
-fun LandingPage() {
+fun LandingPage(navController: NavController) {
     var showProfileMenu by remember { mutableStateOf(false) }
+
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -83,17 +87,17 @@ fun LandingPage() {
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
         ) {
-            MovieItem("IntoTheUnknown", "Into The Unknown", "A thrilling journey beyond the realms of the known universe.", 4.5f)
-            MovieItem("EchosOfEternity", "Echos of Eternity", "A deep dive into the echoes of timeless love and destiny.", 4.0f)
-            MovieItem("LostInTime", "Lost in Time", "A mysterious adventure through different time periods.", 4.2f)
-            MovieItem("ShadowsOfThePast", "Shadows of the Past", "A detective story that unveils hidden truths.", 3.8f)
-            MovieItem("BeneathTheSurface", "Beneath The Surface", "A chilling thriller about secrets lying underwater.", 4.7f)
+            MovieItem("IntoTheUnknown", "Into The Unknown", "A thrilling journey beyond the realms of the known universe.", 4.5f, navController)
+            MovieItem("EchosOfEternity", "Echos of Eternity", "A deep dive into the echoes of timeless love and destiny.", 4.0f, navController)
+            MovieItem("LostInTime", "Lost in Time", "A mysterious adventure through different time periods.", 4.2f, navController)
+            MovieItem("ShadowsOfThePast", "Shadows of the Past", "A detective story that unveils hidden truths.", 3.8f, navController)
+            MovieItem("BeneathTheSurface", "Beneath The Surface", "A chilling thriller about secrets lying underwater.", 4.7f, navController)
         }
     }
 }
 
 @Composable
-fun MovieItem(imageFileName: String, title: String, synopsis: String, rating: Float) {
+fun MovieItem(imageFileName: String, title: String, synopsis: String, rating: Float, navController: NavController) {
     Row(modifier = Modifier
         .fillMaxWidth()
         .padding(16.dp)) {
@@ -105,7 +109,7 @@ fun MovieItem(imageFileName: String, title: String, synopsis: String, rating: Fl
             modifier = Modifier
                 .size(150.dp)
                 .padding(end = 16.dp)
-                .clickable(onClick = { /* TODO: Handle image click */ })
+                .clickable(onClick = { navController.navigate("movie_detail_screen/$imageFileName/$title/$synopsis") })
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(text = title, fontSize = 20.sp, modifier = Modifier.padding(bottom = 4.dp))
@@ -119,7 +123,7 @@ fun MovieItem(imageFileName: String, title: String, synopsis: String, rating: Fl
 @Preview(showBackground = true)
 @Composable
 fun PreviewLandingPage() {
-    LandingPage()
+    LandingPage(navController = rememberNavController())
 }
 
 

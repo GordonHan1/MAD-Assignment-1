@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.it2161.dit99999x.assignment1"
+    namespace = "com.it2161.dit99999x.PopCornMovie"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.it2161.dit99999x.assignment1"
+        applicationId = "com.it2161.dit99999x.PopCornMovie"
         minSdk = 34
         targetSdk = 34
         versionCode = 1
@@ -62,6 +62,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.com.google.code.gson)
     implementation(libs.androidx.lifecycle.process)
+    implementation(libs.androidx.storage)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
