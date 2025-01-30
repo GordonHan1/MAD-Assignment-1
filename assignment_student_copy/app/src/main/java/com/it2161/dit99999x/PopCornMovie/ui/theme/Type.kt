@@ -2,10 +2,17 @@ package com.it2161.dit99999x.PopCornMovie.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.it2161.dit99999x.PopCornMovie.R
 
+val Roboto = FontFamily(
+    Font(R.font.roboto),
+    Font(R.font.roboto_bold, FontWeight.Bold),
+    Font(R.font.roboto, FontWeight.Medium)
+)
 // Set of Material typography styles to start with
 val Typography = Typography(
     bodyLarge = TextStyle(

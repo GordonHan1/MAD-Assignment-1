@@ -42,18 +42,20 @@ fun MainScreen() {
         composable("com.it2161.dit99999x.PopCornMovie.ui.components.RegistrationScreen") {
             RegistrationScreen(navController = navController)  // Pass navController to com.it2161.dit99999x.PopCornMovie.ui.components.RegistrationScreen
         }
-        composable("LandingScreen") {
+        composable("LandingPage") {
             LandingPage(navController = navController)
         }
         composable(
-            route = "MovieDetailScreen/{movieName}/{movieDetails}",
+            route = "MovieDetailScreen/{imageFileName}/{title}/{synopsis}",
             arguments = listOf(
-                navArgument("movieName") { type = NavType.StringType },
-                navArgument("movieDetails") { type = NavType.StringType }
+                navArgument("imageFileName") { type = NavType.StringType },
+                navArgument("title") { type = NavType.StringType },
+                navArgument("synopsis") { type = NavType.StringType }
             )
         ) { backStackEntry ->
-            val movieName = backStackEntry.arguments?.getString("movieName") ?: "Unknown"
-            val movieDetails = backStackEntry.arguments?.getString("movieDetails") ?: "No details available"
+            val imageFileName = backStackEntry.arguments?.getString("imageFileName") ?: ""
+            val title = backStackEntry.arguments?.getString("title") ?: "Unknown"
+            val synopsis = backStackEntry.arguments?.getString("synopsis") ?: "No details available"
 
             // Replace with an actual movie poster bitmap or resource
             val moviePoster = Bitmap.createBitmap(150, 200, Bitmap.Config.ARGB_8888) // Placeholder
@@ -65,9 +67,9 @@ fun MainScreen() {
 
             MovieDetailScreen(
                 navController = navController,
-                movieName = movieName,
+                movieName = title,
                 moviePoster = moviePoster,
-                movieDetails = movieDetails,
+                movieDetails = synopsis,
                 comments = comments
             )
         }
