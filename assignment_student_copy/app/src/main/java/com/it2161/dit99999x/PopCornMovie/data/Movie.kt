@@ -1,7 +1,9 @@
 package com.it2161.dit99999x.PopCornMovie.data
 
 data class MovieResponse(
-    val results: List<Movie>
+    val results: List<Movie>,
+    val page: Int,
+    val total_pages: Int
 )
 
 data class Movie(

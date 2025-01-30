@@ -13,13 +13,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -28,8 +33,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -77,24 +84,45 @@ fun LandingPage(navController: NavController) {
     var movies by remember { mutableStateOf<List<Movie>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
 
-    // Fetch movies whenever 'selectedFilter' changes
-    LaunchedEffect(selectedFilter) {
+    // Pagination state
+    var currentPage by remember { mutableStateOf(1) }
+    var totalPages by remember { mutableStateOf(1) }
+
+    // User input for jumping to a page
+    var pageInput by remember { mutableStateOf("") }
+
+    // Fetch movies whenever 'selectedFilter' OR 'currentPage' changes
+    LaunchedEffect(selectedFilter, currentPage) {
         isLoading = true
         withContext(Dispatchers.IO) {
             try {
                 val response = when (selectedFilter) {
                     MovieListType.POPULAR ->
-                        RetrofitClient.instance.getPopularMovies("24f4591904aa6cb41814de8604cb5e04")
+                        RetrofitClient.instance.getPopularMovies(
+                            apiKey = "24f4591904aa6cb41814de8604cb5e04",
+                            page = currentPage
+                        )
                     MovieListType.TOP_RATED ->
-                        RetrofitClient.instance.getTopRatedMovies("24f4591904aa6cb41814de8604cb5e04")
+                        RetrofitClient.instance.getTopRatedMovies(
+                            apiKey = "24f4591904aa6cb41814de8604cb5e04",
+                            page = currentPage
+                        )
                     MovieListType.NOW_PLAYING ->
-                        RetrofitClient.instance.getNowPlayingMovies("24f4591904aa6cb41814de8604cb5e04")
+                        RetrofitClient.instance.getNowPlayingMovies(
+                            apiKey = "24f4591904aa6cb41814de8604cb5e04",
+                            page = currentPage
+                        )
                     MovieListType.UPCOMING ->
-                        RetrofitClient.instance.getUpcomingMovies("24f4591904aa6cb41814de8604cb5e04")
+                        RetrofitClient.instance.getUpcomingMovies(
+                            apiKey = "24f4591904aa6cb41814de8604cb5e04",
+                            page = currentPage
+                        )
                 }
+
                 movies = response.results
+                totalPages = response.total_pages
             } catch (e: Exception) {
-                // Handle error
+                // Handle error appropriately
             } finally {
                 isLoading = false
             }
@@ -139,11 +167,13 @@ fun LandingPage(navController: NavController) {
                     ),
                     modifier = Modifier
                         .wrapContentWidth()
-                        .height(40.dp)  // Adjust height as needed for a pill look\
+                        .height(40.dp)  // Adjust height as needed for a pill look
                 ) {
-                    Text(text = "Now showing: $selectedOption",
+                    Text(
+                        text = "Now showing: $selectedOption",
                         fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal)
+                        fontWeight = FontWeight.Normal
+                    )
                 }
 
                 DropdownMenu(
@@ -163,6 +193,9 @@ fun LandingPage(navController: NavController) {
                                     "Upcoming" -> MovieListType.UPCOMING
                                     else -> MovieListType.POPULAR
                                 }
+                                // Reset to page 1 whenever filter changes
+                                currentPage = 1
+                                pageInput = "" // Clear the text field
                                 expanded = false
                             }
                         )
@@ -172,8 +205,8 @@ fun LandingPage(navController: NavController) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Loading or Movie list
             if (isLoading) {
+                // Loading indicator
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -181,9 +214,10 @@ fun LandingPage(navController: NavController) {
                     Text("Loading...")
                 }
             } else {
+                // Movie list (takes up remaining space)
                 LazyColumn(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .weight(1f)
                 ) {
                     items(movies) { movie ->
                         MovieItem(
@@ -196,6 +230,19 @@ fun LandingPage(navController: NavController) {
                         )
                     }
                 }
+
+                // ========== PAGINATION CONTROLS AT THE BOTTOM ==========
+                PaginationBar(
+                    currentPage = currentPage,
+                    totalPages = totalPages,
+                    onPageChange = { newPage ->
+                        currentPage = newPage
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    maxVisiblePages = 7  // or however many you want in the row
+                )
             }
         }
     }
@@ -287,4 +334,188 @@ fun MovieItem(
             }
         }
     }
+}
+
+
+@Composable
+fun PaginationBar(
+    currentPage: Int,
+    totalPages: Int,
+    onPageChange: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    maxVisiblePages: Int = 5
+) {
+    // State controlling whether to show the dialog for jumping to a page
+    var showPageJumpDialog by remember { mutableStateOf(false) }
+
+    // Generate a sequence of page “items” (1, 2, …, 9, 10, etc.) plus placeholders (-1 for “…”)
+    val pagesToShow = remember(currentPage, totalPages) {
+        generatePagesList(currentPage, totalPages, maxVisiblePages)
+    }
+
+    // -- Jump-to-page Dialog (or popup) --
+    if (showPageJumpDialog) {
+        PageJumpDialog(
+            totalPages = totalPages,
+            onDismiss = { showPageJumpDialog = false },
+            onPageChosen = {
+                onPageChange(it)
+                showPageJumpDialog = false
+            }
+        )
+    }
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Prev button
+        IconButton(
+            onClick = { if (currentPage > 1) onPageChange(currentPage - 1) },
+            enabled = (currentPage > 1)
+        ) {
+            Icon(
+                imageVector = Icons.Default.ArrowBack,
+                contentDescription = "Previous"
+            )
+        }
+
+        // Page “chips”
+        pagesToShow.forEach { pageItem ->
+            when {
+                // A real page number
+                pageItem >= 1 -> {
+                    OutlinedButton(
+                        onClick = { onPageChange(pageItem) },
+                        // highlight the currently active page
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = if (pageItem == currentPage) Color(0xFFEDE7F6) else Color.White
+                        ),
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    ) {
+                        Text(
+                            text = pageItem.toString(),
+                            color = if (pageItem == currentPage) Color(0xFF6200EE) else Color.Black
+                        )
+                    }
+                }
+                // The “...” placeholder (we use pageItem == -1 to indicate the placeholder)
+                pageItem == -1 -> {
+                    TextButton(
+                        onClick = { showPageJumpDialog = true },
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    ) {
+                        Text("...")
+                    }
+                }
+            }
+        }
+
+        // Next button
+        IconButton(
+            onClick = { if (currentPage < totalPages) onPageChange(currentPage + 1) },
+            enabled = (currentPage < totalPages)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = "Next"
+            )
+        }
+    }
+}
+
+/**
+ * Helper function: generates a list of integers representing page numbers + “-1” for “...”
+ * Example output: [1, 2, -1, 8, 9, 10] if totalPages=10, currentPage ~ middle, etc.
+ */
+fun generatePagesList(
+    currentPage: Int,
+    totalPages: Int,
+    maxVisiblePages: Int
+): List<Int> {
+    // If total pages are small enough, just show them all
+    if (totalPages <= maxVisiblePages) {
+        return (1..totalPages).toList()
+    }
+
+    val pages = mutableListOf<Int>()
+
+    val firstPage = 1
+    val lastPage = totalPages
+
+    // Always add the first page
+    pages.add(firstPage)
+
+    // Decide how many pages to show around the current page
+    val halfRange = (maxVisiblePages - 3) / 2  // -3 for first, last, and maybe the "..."
+
+    // Lower bound in the middle
+    val start = (currentPage - halfRange).coerceAtLeast(firstPage + 1)
+    // Upper bound in the middle
+    val end = (start + (maxVisiblePages - 3)).coerceAtMost(lastPage - 1)
+
+    // If the gap between the first page and the start is > 1, add “...”
+    if (start > firstPage + 1) {
+        pages.add(-1)  // “...”
+    }
+
+    // Add the middle range
+    for (page in start..end) {
+        pages.add(page)
+    }
+
+    // If the gap between the end and the last page is > 1, add “...”
+    if (end < lastPage - 1) {
+        pages.add(-1)  // “...”
+    }
+
+    // Always add the last page
+    pages.add(lastPage)
+
+    return pages
+}
+
+@Composable
+fun PageJumpDialog(
+    totalPages: Int,
+    onDismiss: () -> Unit,
+    onPageChosen: (Int) -> Unit
+) {
+    var textValue by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Go to Page") },
+        text = {
+            Column {
+                Text("Enter a page between 1 and $totalPages:")
+                OutlinedTextField(
+                    value = textValue,
+                    onValueChange = { textValue = it },
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val number = textValue.toIntOrNull()
+                    if (number != null && number in 1..totalPages) {
+                        onPageChosen(number)
+                    } else {
+                        // Optionally handle invalid inputs here
+                        onDismiss()
+                    }
+                }
+            ) {
+                Text("Go")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
