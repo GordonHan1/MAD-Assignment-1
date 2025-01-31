@@ -1,97 +1,91 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
-
 package com.it2161.dit99999x.PopCornMovie.ui.components
 
-import android.graphics.Bitmap
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
-import java.util.Date
-import kotlin.math.abs
+import coil.compose.AsyncImage
+import com.it2161.dit99999x.PopCornMovie.data.MovieDetailsResponse
+import com.it2161.dit99999x.PopCornMovie.ui.components.MovieReview
+import java.text.NumberFormat
+import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MovieDetailScreen(navController: NavController, movieName: String, moviePoster: Bitmap, movieDetails: String, comments: List<Comment>) {
-    var showMenu by remember { mutableStateOf(false) }
+fun MovieDetailScreen(
+    navController: NavController,
+    movieId: Int,
+    viewModel: MovieDetailsViewModel = viewModel()
+) {
+    val movieDetails by viewModel.movieDetails.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+    val reviews by viewModel.reviews.collectAsState()
+    val isLoadingReviews by viewModel.isLoadingReviews.collectAsState()
+    val reviewsError by viewModel.reviewsError.collectAsState()
+
+    LaunchedEffect(movieId) {
+        viewModel.fetchMovieDetails(movieId)
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Row(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back Arrow")
-                        }
-                        Text(movieName, textAlign = TextAlign.Center, modifier = Modifier.weight(2f))
-                        Box(contentAlignment = Alignment.CenterEnd) {
-                            IconButton(onClick = { showMenu = !showMenu }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "Overflow Menu")
-                                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                                    DropdownMenuItem(
-                                        text = { Text("Add comments") },
-                                        onClick = {
-                                            navController.navigate("add_comment_screen")
-                                            showMenu = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
+                title = { Text(text = movieDetails?.title ?: "Movie Details") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                }
             )
         }
-    ) { paddingValues ->
-        Column(
+    ) { innerPadding ->
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(innerPadding)
         ) {
-            Row(modifier = Modifier.padding(16.dp)) {
-                Image(
-                    bitmap = moviePoster.asImageBitmap(),
-                    contentDescription = null,
-                    modifier = Modifier.size(150.dp)
-                )
-                Column(modifier = Modifier.padding(start = 16.dp)) {
-                    Text(text = movieName, fontSize = 24.sp)
-                    Text(text = movieDetails, fontSize = 16.sp)
+            when {
+                isLoading -> {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 }
-            }
-
-            Text(
-                text = "Comments",
-                modifier = Modifier.padding(16.dp),
-                fontSize = 20.sp,
-                color = Color.Gray
-            )
-
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(comments.sortedByDescending { it.timestamp }) { comment ->
-                    CommentItem(comment) { clickedComment ->
-                        navController.navigate("view_comment_screen/${clickedComment.id}")
-                    }
+                errorMessage != null -> {
+                    Text(
+                        text = "Error: $errorMessage",
+                        modifier = Modifier.align(Alignment.Center),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                movieDetails != null -> {
+                    MovieDetailsContent(
+                        details = movieDetails!!,
+                        reviews = reviews,
+                        isLoadingReviews = isLoadingReviews,
+                        reviewsError = reviewsError
+                    )
                 }
             }
         }
@@ -99,53 +93,177 @@ fun MovieDetailScreen(navController: NavController, movieName: String, moviePost
 }
 
 @Composable
-fun CommentItem(comment: Comment, onCommentClick: (Comment) -> Unit) {
-    val currentTime = Date()
-    val timeDifference = abs(currentTime.time - comment.timestamp.time) / (1000 * 60 * 60)
-    val timeAgoText = if (timeDifference < 24) "$timeDifference hrs ago" else "${timeDifference / 24} days ago"
+fun MovieDetailsContent(
+    details: MovieDetailsResponse,
+    reviews: List<MovieReview>,
+    isLoadingReviews: Boolean,
+    reviewsError: String?
+) {
+    val formattedRevenue = NumberFormat.getNumberInstance(Locale.US).format(details.revenue)
 
     Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-            .clickable { onCommentClick(comment) }
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
     ) {
-        Text(text = comment.userName, fontSize = 16.sp, color = Color.Black)
-        Text(text = comment.content, fontSize = 14.sp, color = Color.Gray)
-        Text(text = timeAgoText, fontSize = 12.sp, color = Color.Gray)
+        Image(
+            painter = rememberAsyncImagePainter(
+                ImageRequest.Builder(LocalContext.current)
+                    .data("https://image.tmdb.org/t/p/w500${details.poster_path}")
+                    .crossfade(true)
+                    .build()
+            ),
+            contentDescription = "Movie Poster",
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(500.dp),
+            contentScale = ContentScale.Crop
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            shape = RoundedCornerShape(12.dp),
+            elevation = CardDefaults.cardElevation(8.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = details.title,
+                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(text = "Release: ${details.releaseDate} | Language: ${details.originalLanguage.uppercase()}")
+                Text(text = "Genres: ${details.genres.joinToString { it.name }}")
+                Text(text = "Runtime: ${details.runtime ?: 0} min | Rating: ${details.voteAverage}/10")
+                Text(text = "Revenue: $$formattedRevenue")
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = details.overview,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            shape = RoundedCornerShape(12.dp),
+            elevation = CardDefaults.cardElevation(8.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Reviews",
+                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                when {
+                    isLoadingReviews -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                    reviewsError != null -> Text(text = "Error loading reviews: $reviewsError", color = MaterialTheme.colorScheme.error)
+                    reviews.isEmpty() -> Text(text = "No reviews available")
+                    else -> {
+                        reviews.forEachIndexed { index, review ->
+                            if (index > 0) {
+                                Divider(modifier = Modifier.padding(vertical = 8.dp))
+                            }
+                            ReviewItem(
+                                author = review.author,
+                                rating = review.author_details?.rating ?: 0f,
+                                content = review.content,
+                                date = review.createdAt,
+                                avatarPath = review.author_details?.avatar_path
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
-// Sample data model for Comment
-data class Comment(val id: String, val userName: String, val content: String, val timestamp: Date)
-
-@Preview(showBackground = true)
 @Composable
-fun MovieDetailScreenPreview() {
-    // Mock NavController
-    val navController = rememberNavController()
+fun ReviewItem(
+    author: String,
+    rating: Float,
+    content: String,
+    date: String?,
+    avatarPath: String?
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        if (!avatarPath.isNullOrBlank() && !avatarPath.endsWith("null")) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data("https://image.tmdb.org/t/p/w185${avatarPath}")
+                    .crossfade(true)
+                    .build(),
+                contentDescription = "Author avatar",
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = author.firstOrNull()?.uppercase() ?: "?",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            }
+        }
 
-    // Sample data for the movie
-    val sampleMovieName = "Inception"
-    val sampleMovieDetails = "A mind-bending thriller by Christopher Nolan."
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = author,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "★ $rating",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
 
-    // Placeholder Bitmap for the movie poster
-    val sampleBitmap = Bitmap.createBitmap(150, 200, Bitmap.Config.ARGB_8888)
+            date?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
-    // Sample comments
-    val sampleComments = listOf(
-        Comment("1", "User1", "Amazing movie!", Date(Date().time - 3600 * 1000)), // 1 hour ago
-        Comment("2", "User2", "Loved the visuals!", Date(Date().time - 7200 * 1000)), // 2 hours ago
-        Comment("3", "User3", "Great story!", Date(Date().time - 172800 * 1000)) // 2 days ago
-    )
+            Spacer(modifier = Modifier.height(8.dp))
 
-    // Preview the MovieDetailScreen composable
-    MovieDetailScreen(
-        navController = navController,
-        movieName = sampleMovieName,
-        moviePoster = sampleBitmap,
-        movieDetails = sampleMovieDetails,
-        comments = sampleComments
-    )
+            Text(
+                text = content,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
 }
-

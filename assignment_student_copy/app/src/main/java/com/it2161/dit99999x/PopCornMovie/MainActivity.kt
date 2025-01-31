@@ -1,5 +1,6 @@
 package com.it2161.dit99999x.PopCornMovie
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -12,30 +13,36 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.it2161.dit99999x.PopCornMovie.ui.components.Comment
 import com.it2161.dit99999x.PopCornMovie.ui.components.LandingPage
 import com.it2161.dit99999x.PopCornMovie.ui.components.LoginScreen
 import com.it2161.dit99999x.PopCornMovie.ui.components.RegistrationScreen
 import com.it2161.dit99999x.PopCornMovie.ui.theme.Assignment1Theme
+import com.it2161.dit99999x.PopCornMovie.ui.components.ProfileScreen
 import com.it2161.dit99999x.PopCornMovie.ui.components.MovieDetailScreen
 import java.util.Date
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val sharedPreferences = getSharedPreferences("UserPrefs", Context.MODE_PRIVATE)
+        val isLoggedIn = sharedPreferences.getBoolean("isLoggedIn", false)
         enableEdgeToEdge()
         setContent {
             Assignment1Theme {
-                MainScreen()
+                MainScreen(isLoggedIn = isLoggedIn)
             }
         }
     }
 }
 
 @Composable
-fun MainScreen() {
+fun MainScreen(isLoggedIn: Boolean) {
     val navController = rememberNavController()
-    NavHost(navController = navController, startDestination = "LoginScreen") {  // Set LoginScreen as the start destination
+    NavHost(
+        navController = navController,
+        // Change start destination based on login state
+        startDestination = if (isLoggedIn) "LandingPage" else "LoginScreen"
+    ){  // Set LoginScreen as the start destination
         composable("LoginScreen") {
             LoginScreen(navController = navController)  // Pass navController to LoginScreen
         }
@@ -45,42 +52,15 @@ fun MainScreen() {
         composable("LandingPage") {
             LandingPage(navController = navController)
         }
+        composable("ProfileScreen") {
+            ProfileScreen(navController)
+        }
         composable(
-            route = "MovieDetailScreen/{imageFileName}/{title}/{synopsis}",
-            arguments = listOf(
-                navArgument("imageFileName") { type = NavType.StringType },
-                navArgument("title") { type = NavType.StringType },
-                navArgument("synopsis") { type = NavType.StringType }
-            )
+            route = "movie_detail_screen/{movieId}",
+            arguments = listOf(navArgument("movieId") { type = NavType.IntType })
         ) { backStackEntry ->
-            val imageFileName = backStackEntry.arguments?.getString("imageFileName") ?: ""
-            val title = backStackEntry.arguments?.getString("title") ?: "Unknown"
-            val synopsis = backStackEntry.arguments?.getString("synopsis") ?: "No details available"
-
-            // Replace with an actual movie poster bitmap or resource
-            val moviePoster = Bitmap.createBitmap(150, 200, Bitmap.Config.ARGB_8888) // Placeholder
-            val comments = listOf(
-                Comment("1", "User1", "Amazing movie!", Date(Date().time - 3600 * 1000)),
-                Comment("2", "User2", "Loved the visuals!", Date(Date().time - 7200 * 1000)),
-                Comment("3", "User3", "Great story!", Date(Date().time - 172800 * 1000))
-            )
-
-            MovieDetailScreen(
-                navController = navController,
-                movieName = title,
-                moviePoster = moviePoster,
-                movieDetails = synopsis,
-                comments = comments
-            )
+            val movieId = backStackEntry.arguments?.getInt("movieId") ?: 0
+            MovieDetailScreen(navController = navController, movieId = movieId)
         }
     }
 }
-
-@Preview(showBackground = true)
-@Composable
-fun MainScreenPreview() {
-    Assignment1Theme {
-        MainScreen()
-    }
-}
-

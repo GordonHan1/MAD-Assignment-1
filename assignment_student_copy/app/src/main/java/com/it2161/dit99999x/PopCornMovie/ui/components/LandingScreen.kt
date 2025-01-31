@@ -1,8 +1,12 @@
 package com.it2161.dit99999x.PopCornMovie.ui.components
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,16 +18,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -31,6 +39,10 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
@@ -44,28 +56,42 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
+import com.it2161.dit99999x.PopCornMovie.R
 import com.it2161.dit99999x.PopCornMovie.data.Movie
 import com.it2161.dit99999x.PopCornMovie.data.RetrofitClient
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import com.it2161.dit99999x.PopCornMovie.R
+import com.it2161.dit99999x.PopCornMovie.ui.screens.LandingPageViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.it2161.dit99999x.PopCornMovie.ui.theme.Roboto
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlin.math.max
+
 
 enum class MovieListType {
     POPULAR, TOP_RATED, NOW_PLAYING, UPCOMING
@@ -73,176 +99,164 @@ enum class MovieListType {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LandingPage(navController: NavController) {
+fun LandingPage(
+    navController: NavController,
+    viewModel: LandingPageViewModel = viewModel()
+) {
+    var scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    // Observe the view model’s state
+    val movies = viewModel.movies
+    val isLoading = viewModel.isLoading
+    val currentPage = viewModel.currentPage
+    val totalPages = viewModel.totalPages
+    val selectedFilter = viewModel.selectedFilter
+
+    // The rest of your local states...
     var expanded by remember { mutableStateOf(false) }
     var selectedOption by remember { mutableStateOf("Popular") }
     val options = listOf("Popular", "Top Rated", "Upcoming", "Now Playing")
 
-    // Map selectedOption string to MovieListType
-    var selectedFilter by remember { mutableStateOf(MovieListType.POPULAR) }
+    val lazyListState = rememberLazyListState()
 
-    var movies by remember { mutableStateOf<List<Movie>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-
-    // Pagination state
-    var currentPage by remember { mutableStateOf(1) }
-    var totalPages by remember { mutableStateOf(1) }
-
-    // User input for jumping to a page
-    var pageInput by remember { mutableStateOf("") }
-
-    // Fetch movies whenever 'selectedFilter' OR 'currentPage' changes
-    LaunchedEffect(selectedFilter, currentPage) {
-        isLoading = true
-        withContext(Dispatchers.IO) {
-            try {
-                val response = when (selectedFilter) {
-                    MovieListType.POPULAR ->
-                        RetrofitClient.instance.getPopularMovies(
-                            apiKey = "24f4591904aa6cb41814de8604cb5e04",
-                            page = currentPage
-                        )
-                    MovieListType.TOP_RATED ->
-                        RetrofitClient.instance.getTopRatedMovies(
-                            apiKey = "24f4591904aa6cb41814de8604cb5e04",
-                            page = currentPage
-                        )
-                    MovieListType.NOW_PLAYING ->
-                        RetrofitClient.instance.getNowPlayingMovies(
-                            apiKey = "24f4591904aa6cb41814de8604cb5e04",
-                            page = currentPage
-                        )
-                    MovieListType.UPCOMING ->
-                        RetrofitClient.instance.getUpcomingMovies(
-                            apiKey = "24f4591904aa6cb41814de8604cb5e04",
-                            page = currentPage
-                        )
-                }
-
-                movies = response.results
-                totalPages = response.total_pages
-            } catch (e: Exception) {
-                // Handle error appropriately
-            } finally {
-                isLoading = false
-            }
-        }
+    LaunchedEffect(viewModel.currentPage) {
+        lazyListState.scrollToItem(0)
+        scrollBehavior.state.heightOffset = 0f
+    }
+    // 1) If you want to fetch immediately when the composable is first displayed:
+    LaunchedEffect(Unit, selectedFilter) {
+        viewModel.fetchMovies()
     }
 
-    Scaffold(
+    // 2) When user changes the filter from the dropdown
+    //    we'll call viewModel.updateFilter(...) in onClick
+
+    // 3) When user changes the page (onPageChange), we'll call viewModel.setPage(newPage)
+
+    Scaffold(Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        // topBar and bottomBar as before
         topBar = {
             TopAppBar(
-                title = {
-                    // TMDb logo in the TopBar
-                    Image(
-                        painter = painterResource(id = R.drawable.tmdblogo1),
-                        contentDescription = "TMDb Logo"
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF0D253F) // Your dark color
-                )
-            )
-        }
-    ) { paddingValues ->
-        // Main content below the TopBar
-        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-        ) {
-            // “Now showing: X” row
+                .fillMaxWidth()
+                .background(color = MaterialTheme.colorScheme.primary),
+            title = {
+                Image(
+                    painter = painterResource(id = R.drawable.tmdblogo1),
+                    contentDescription = "TMDb Logo",
+                    modifier = Modifier.size(150.dp) // Adjust size as needed
+                )
+            },
+            scrollBehavior = scrollBehavior,
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color(0xFF0D253F),
+                scrolledContainerColor = Color(0xFF0D253F),
+            )
+        )
+        },
+        bottomBar = { BottomAppBar(navController) }
+    ) { paddingValues ->
+        if (isLoading) {
             Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.CenterStart
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentAlignment = Alignment.Center
             ) {
-                OutlinedButton(
-                    onClick = { expanded = true },
-                    shape = RoundedCornerShape(50), // Creates a "pill" shape
-                    border = BorderStroke(1.dp, Color.Black),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Black
-                    ),
-                    modifier = Modifier
-                        .wrapContentWidth()
-                        .height(40.dp)  // Adjust height as needed for a pill look
-                ) {
-                    Text(
-                        text = "Now showing: $selectedOption",
-                        fontFamily = Roboto,
-                        fontWeight = FontWeight.Normal
+                Text("Loading...")
+            }
+        } else {
+            LazyColumn(
+                state = lazyListState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(horizontal = 0.dp)
+                    .androidScrollbar(state = lazyListState)
+            ) {
+
+                item {
+                    PaginationBar(
+                        currentPage = currentPage,
+                        totalPages = totalPages,
+                        onPageChange = { newPage ->
+                            viewModel.setPage(newPage)
+                            // Also if you want to scroll to top:
+                            // Make sure to do this inside a coroutine:
+                            // rememberCoroutineScope().launch {
+                            //     lazyListState.animateScrollToItem(0)
+                            // }
+                        }
+                    )
+                }
+                // Dropdown item
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 2.dp),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        OutlinedButton(
+                            onClick = { expanded = true },
+                            shape = RoundedCornerShape(50),
+                            /* border, colors, etc. */
+                        ) {
+                            Text("Now showing: $selectedOption")
+                        }
+
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            options.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        selectedOption = option
+                                        val filterType = when (option) {
+                                            "Popular" -> MovieListType.POPULAR
+                                            "Top Rated" -> MovieListType.TOP_RATED
+                                            "Now Playing" -> MovieListType.NOW_PLAYING
+                                            "Upcoming" -> MovieListType.UPCOMING
+                                            else -> MovieListType.POPULAR
+                                        }
+                                        viewModel.updateFilter(filterType)
+                                        expanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Movie items
+                items(movies) { movie ->
+                    MovieItem(
+                        movieId = movie.id,
+                        imageFileName = movie.poster_path ?: "",
+                        title = movie.title,
+                        synopsis = movie.overview,
+                        rating = movie.vote_average,
+                        releaseDate = movie.release_date,
+                        navController = navController
                     )
                 }
 
-                DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
-                ) {
-                    options.forEach { option ->
-                        DropdownMenuItem(
-                            text = { Text(option) },
-                            onClick = {
-                                selectedOption = option
-                                // Map the string to the enum
-                                selectedFilter = when (option) {
-                                    "Popular" -> MovieListType.POPULAR
-                                    "Top Rated" -> MovieListType.TOP_RATED
-                                    "Now Playing" -> MovieListType.NOW_PLAYING
-                                    "Upcoming" -> MovieListType.UPCOMING
-                                    else -> MovieListType.POPULAR
-                                }
-                                // Reset to page 1 whenever filter changes
-                                currentPage = 1
-                                pageInput = "" // Clear the text field
-                                expanded = false
-                            }
-                        )
-                    }
+                // Pagination bar
+                item {
+                    PaginationBar(
+                        currentPage = currentPage,
+                        totalPages = totalPages,
+                        onPageChange = { newPage ->
+                            viewModel.setPage(newPage)
+                            // Also if you want to scroll to top:
+                            // Make sure to do this inside a coroutine:
+                            // rememberCoroutineScope().launch {
+                            //     lazyListState.animateScrollToItem(0)
+                            // }
+                        }
+                    )
                 }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (isLoading) {
-                // Loading indicator
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Loading...")
-                }
-            } else {
-                // Movie list (takes up remaining space)
-                LazyColumn(
-                    modifier = Modifier
-                        .weight(1f)
-                ) {
-                    items(movies) { movie ->
-                        MovieItem(
-                            imageFileName = movie.poster_path,
-                            title = movie.title,
-                            synopsis = movie.overview,
-                            rating = movie.vote_average,
-                            releaseDate = movie.release_date,
-                            navController = navController
-                        )
-                    }
-                }
-
-                // ========== PAGINATION CONTROLS AT THE BOTTOM ==========
-                PaginationBar(
-                    currentPage = currentPage,
-                    totalPages = totalPages,
-                    onPageChange = { newPage ->
-                        currentPage = newPage
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    maxVisiblePages = 7  // or however many you want in the row
-                )
             }
         }
     }
@@ -250,130 +264,179 @@ fun LandingPage(navController: NavController) {
 
 @Composable
 fun MovieItem(
+    movieId: Int,
     imageFileName: String,
     title: String,
     synopsis: String,
     rating: Float,
-    releaseDate: String, // Add this parameter
+    releaseDate: String,
     navController: NavController
 ) {
+    val isDark = isSystemInDarkTheme()
     OutlinedCard(
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(12.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(10.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
             .clickable {
-                // Navigate when the entire card is clicked
-                navController.navigate("movie_detail_screen/$imageFileName/$title/$synopsis")
+                navController.navigate("movie_detail_screen/$movieId")
             }
             .shadow(
                 elevation = 8.dp,
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(12.dp),
                 clip = true
             ),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Make the image fill the left side and clip its left corners
-            Image(
-                painter = rememberAsyncImagePainter(
-                    ImageRequest.Builder(LocalContext.current)
-                        .data("https://image.tmdb.org/t/p/w500$imageFileName")
-                        .crossfade(true)
-                        .build()
-                ),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
+            // Movie Poster with Circular Rating Overlay
+            Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp))
-                    .size(width = 80.dp, height = 120.dp)
-            )
+                    .clip(RoundedCornerShape(8.dp))
+                    .size(width = 100.dp, height = 150.dp)
+            ) {
+                // Movie Poster Image
+                Image(
+                    painter = rememberAsyncImagePainter(
+                        ImageRequest.Builder(LocalContext.current)
+                            .data("https://image.tmdb.org/t/p/w500$imageFileName")
+                            .crossfade(true)
+                            .build()
+                    ),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
 
+                // Circular Rating Indicator
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(3.dp)
+                        .size(30.dp) // Size of the circular progress bar
+                        .background(Color.Black.copy(alpha = 0.7f), CircleShape) // Background for the circle
+                ) {
+                    // Draw the circular progress bar
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val strokeWidth = 2.3.dp.toPx()
+                        val radius = (size.minDimension - strokeWidth) / 2
+                        val centerOffset = size.width / 2
+
+                        // Background circle
+                        drawCircle(
+                            color = Color.LightGray.copy(alpha = 0.3f),
+                            radius = radius,
+                            center = Offset(centerOffset, centerOffset),
+                            style = Stroke(strokeWidth)
+                        )
+
+                        // Progress circle
+                        val sweepAngle = (rating / 10) * 360 // Convert rating to degrees
+                        drawArc(
+                            color = Color(0xFF24C274), // Green color for progress
+                            startAngle = -90f, // Start from the top
+                            sweepAngle = sweepAngle,
+                            useCenter = false,
+                            topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
+                            size = Size(size.width - strokeWidth, size.height - strokeWidth),
+                            style = Stroke(strokeWidth)
+                        )
+                    }
+
+                    // Percentage Text in the Center
+                    Text(
+                        text = "${(rating * 10).toInt()}%",
+                        color = Color.White,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Movie Details
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(6.dp),
-                verticalArrangement = Arrangement.Center
+                    .padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 // Movie Title
+                val titleColor = if (isDark) Color(0xFF174575) else Color(0xFF0D253F)
+
                 Text(
                     text = title,
                     fontFamily = Roboto,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(bottom = 0.dp)
+                    fontSize = 16.sp,
+                    color = titleColor,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
 
-                // Release Date in Gray Text
+                // Release Date
                 Text(
                     text = releaseDate,
                     fontFamily = Roboto,
                     fontSize = 12.sp,
-                    color = Color.Gray,
-                    modifier = Modifier.padding(bottom = 0.dp)
+                    color = Color.Gray
                 )
+
+                Spacer(modifier = Modifier.height(4.dp))
 
                 // Synopsis
                 Text(
                     text = synopsis,
                     fontFamily = Roboto,
                     fontSize = 12.sp,
-                    maxLines = 2,
-                    lineHeight = 14.sp,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(bottom = 0.dp)
-                )
-
-                // Rating
-                Text(
-                    text = "Rating: $rating/10",
-                    fontSize = 10.sp
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 3,
+                    lineHeight = 12.sp,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
     }
 }
 
-
+/** Same PaginationBar and related functions as before. **/
 @Composable
 fun PaginationBar(
     currentPage: Int,
     totalPages: Int,
     onPageChange: (Int) -> Unit,
-    modifier: Modifier = Modifier,
-    maxVisiblePages: Int = 5
+    modifier: Modifier = Modifier
 ) {
-    // State controlling whether to show the dialog for jumping to a page
-    var showPageJumpDialog by remember { mutableStateOf(false) }
-
-    // Generate a sequence of page “items” (1, 2, …, 9, 10, etc.) plus placeholders (-1 for “…”)
-    val pagesToShow = remember(currentPage, totalPages) {
-        generatePagesList(currentPage, totalPages, maxVisiblePages)
-    }
-
-    // -- Jump-to-page Dialog (or popup) --
-    if (showPageJumpDialog) {
-        PageJumpDialog(
-            totalPages = totalPages,
-            onDismiss = { showPageJumpDialog = false },
-            onPageChosen = {
-                onPageChange(it)
-                showPageJumpDialog = false
-            }
-        )
-    }
+    val displayedPages = (currentPage - 2..currentPage + 2).filter { it in 1..totalPages }
 
     Row(
-        modifier = modifier,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Prev button
+        // First Page Button
+        IconButton(
+            onClick = { onPageChange(1) },
+            enabled = currentPage > 1
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.round_keyboard_double_arrow_left_24), // Use painterResource for vector asset
+                contentDescription = "First Page"
+            )
+        }
+
+        // Previous Page Button
         IconButton(
             onClick = { if (currentPage > 1) onPageChange(currentPage - 1) },
-            enabled = (currentPage > 1)
+            enabled = currentPage > 1
         ) {
             Icon(
                 imageVector = Icons.Default.ArrowBack,
@@ -381,141 +444,104 @@ fun PaginationBar(
             )
         }
 
-        // Page “chips”
-        pagesToShow.forEach { pageItem ->
-            when {
-                // A real page number
-                pageItem >= 1 -> {
-                    OutlinedButton(
-                        onClick = { onPageChange(pageItem) },
-                        // highlight the currently active page
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = if (pageItem == currentPage) Color(0xFFEDE7F6) else Color.White
-                        ),
-                        modifier = Modifier.padding(horizontal = 4.dp)
-                    ) {
-                        Text(
-                            text = pageItem.toString(),
-                            color = if (pageItem == currentPage) Color(0xFF6200EE) else Color.Black
-                        )
-                    }
-                }
-                // The “...” placeholder (we use pageItem == -1 to indicate the placeholder)
-                pageItem == -1 -> {
-                    TextButton(
-                        onClick = { showPageJumpDialog = true },
-                        modifier = Modifier.padding(horizontal = 4.dp)
-                    ) {
-                        Text("...")
-                    }
-                }
+        // Page Numbers
+        displayedPages.forEach { page ->
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 2.dp)
+                    .clip(RoundedCornerShape(12.dp)) // Squircle shape
+                    .background(if (page == currentPage) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color.Transparent)
+                    .clickable { onPageChange(page) }
+                    .padding(horizontal = 5.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = page.toString(),
+                    fontWeight = if (page == currentPage) FontWeight.Bold else FontWeight.Normal,
+                    color = if (page == currentPage) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                )
             }
         }
 
-        // Next button
+        // Next Page Button
         IconButton(
             onClick = { if (currentPage < totalPages) onPageChange(currentPage + 1) },
-            enabled = (currentPage < totalPages)
+            enabled = currentPage < totalPages
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                 contentDescription = "Next"
             )
         }
+
+        // Last Page Button
+        IconButton(
+            onClick = { onPageChange(totalPages) },
+            enabled = currentPage < totalPages
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.round_keyboard_double_arrow_right_24),
+                contentDescription = "Last Page"
+            )
+        }
     }
 }
 
-/**
- * Helper function: generates a list of integers representing page numbers + “-1” for “...”
- * Example output: [1, 2, -1, 8, 9, 10] if totalPages=10, currentPage ~ middle, etc.
- */
-fun generatePagesList(
-    currentPage: Int,
-    totalPages: Int,
-    maxVisiblePages: Int
-): List<Int> {
-    // If total pages are small enough, just show them all
-    if (totalPages <= maxVisiblePages) {
-        return (1..totalPages).toList()
-    }
-
-    val pages = mutableListOf<Int>()
-
-    val firstPage = 1
-    val lastPage = totalPages
-
-    // Always add the first page
-    pages.add(firstPage)
-
-    // Decide how many pages to show around the current page
-    val halfRange = (maxVisiblePages - 3) / 2  // -3 for first, last, and maybe the "..."
-
-    // Lower bound in the middle
-    val start = (currentPage - halfRange).coerceAtLeast(firstPage + 1)
-    // Upper bound in the middle
-    val end = (start + (maxVisiblePages - 3)).coerceAtMost(lastPage - 1)
-
-    // If the gap between the first page and the start is > 1, add “...”
-    if (start > firstPage + 1) {
-        pages.add(-1)  // “...”
-    }
-
-    // Add the middle range
-    for (page in start..end) {
-        pages.add(page)
-    }
-
-    // If the gap between the end and the last page is > 1, add “...”
-    if (end < lastPage - 1) {
-        pages.add(-1)  // “...”
-    }
-
-    // Always add the last page
-    pages.add(lastPage)
-
-    return pages
-}
 
 @Composable
-fun PageJumpDialog(
-    totalPages: Int,
-    onDismiss: () -> Unit,
-    onPageChosen: (Int) -> Unit
-) {
-    var textValue by remember { mutableStateOf("") }
+fun Modifier.androidScrollbar(
+    state: LazyListState,
+    color: Color = Color(0xFF666666),
+    minThumbHeight: Dp = 24.dp
+): Modifier {
+    val previousProgress = remember { mutableStateOf(0f) }
+    val previousThumbHeight = remember { mutableStateOf(0f) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Go to Page") },
-        text = {
-            Column {
-                Text("Enter a page between 1 and $totalPages:")
-                OutlinedTextField(
-                    value = textValue,
-                    onValueChange = { textValue = it },
-                    singleLine = true
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    val number = textValue.toIntOrNull()
-                    if (number != null && number in 1..totalPages) {
-                        onPageChosen(number)
-                    } else {
-                        // Optionally handle invalid inputs here
-                        onDismiss()
-                    }
-                }
-            ) {
-                Text("Go")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
+    return drawWithContent {
+        drawContent()
+
+        if (state.layoutInfo.totalItemsCount > 0) {
+            // Extract values to reduce redundant computations
+            val layoutInfo = state.layoutInfo
+            val firstVisibleItemIndex = state.firstVisibleItemIndex
+            val visibleItemsCount = layoutInfo.visibleItemsInfo.size
+            val totalItemsCount = layoutInfo.totalItemsCount
+
+            if (visibleItemsCount == 0 || totalItemsCount <= visibleItemsCount) return@drawWithContent
+
+            val firstVisibleItemOffset = state.firstVisibleItemScrollOffset
+            val itemSize = layoutInfo.visibleItemsInfo.firstOrNull()?.size?.toFloat() ?: return@drawWithContent
+
+            // Precompute constants
+            val totalScrollableDistance = (totalItemsCount - visibleItemsCount).coerceAtLeast(1).toFloat()
+            val normalizedOffset = firstVisibleItemOffset / itemSize
+            val exactProgress = (firstVisibleItemIndex + normalizedOffset) / totalScrollableDistance
+
+            // Smooth progress and avoid sudden jumps
+            val smoothedProgress = lerp(previousProgress.value, exactProgress.coerceIn(0f, 1f), 0.15f)
+            previousProgress.value = smoothedProgress
+
+            // Compute raw scrollbar height and apply smoothing
+            val rawThumbHeight = (visibleItemsCount.toFloat() / totalItemsCount.toFloat()) * size.height
+            val smoothThumbHeight = lerp(previousThumbHeight.value, rawThumbHeight.coerceAtLeast(minThumbHeight.toPx()), 0.15f)
+            previousThumbHeight.value = smoothThumbHeight
+
+            // Compute final scrollbar position
+            val scrollbarOffsetY = (size.height - smoothThumbHeight) * smoothedProgress
+
+            // Draw scrollbar
+            drawRect(
+                color = color,
+                topLeft = Offset(size.width - 4.dp.toPx(), scrollbarOffsetY),
+                size = Size(4.dp.toPx(), smoothThumbHeight),
+                alpha = if (state.isScrollInProgress) 0.8f else 0.6f
+            )
         }
-    )
+    }
 }
+
+// Linear interpolation function
+fun lerp(start: Float, stop: Float, fraction: Float): Float {
+    return start + (stop - start) * fraction
+}
+
+
