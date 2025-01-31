@@ -4,8 +4,5 @@ data class UserProfile(
     val userName: String,
     val password: String,
     val email: String,
-    val gender: String,
-    val mobile: String,
     val updates: Boolean,
-    val yob: String
 )

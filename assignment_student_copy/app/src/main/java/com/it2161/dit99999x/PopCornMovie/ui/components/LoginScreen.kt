@@ -140,18 +140,22 @@ fun LoginScreen(navController: NavController) {
                     if ((userId == defaultUserId && password == defaultPassword) ||
                         (userId == registeredUsername && password == registeredPassword)
                     ) {
-                        navController.navigate("LandingPage")
+                        // Mark user as logged in
+                        sharedPreferences
+                            .edit()
+                            .putBoolean("isLoggedIn", true)
+                            .apply()
+
+                        // Navigate to landing page
+                        navController.navigate("LandingPage") {
+                            // Remove the LoginScreen from the backstack so user can't go back to it
+                            popUpTo("LoginScreen") { inclusive = true }
+                        }
                     } else {
                         Toast.makeText(context, "Invalid credentials", Toast.LENGTH_SHORT).show()
                     }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                )
+                // ...
             ) {
                 Text("Login")
             }
