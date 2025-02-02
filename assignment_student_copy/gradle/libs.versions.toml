@@ -1,7 +1,8 @@
 [versions]
-agp = "8.5.1"
+agp = "8.8.0"
 coilCompose = "2.2.2"
 converterGson = "2.9.0"
+#noinspection GradleDependency
 kotlin = "1.9.0"
 coreKtx = "1.13.1"
 junit = "4.13.2"
@@ -15,10 +16,16 @@ navigationCompose = "2.8.3"
 gson = "2.10"
 lifecycleProcess = "2.8.6"
 retrofit = "2.9.0"
+roomCompiler = "2.5.2"
+roomRuntime = "2.6.1"
 storage = "1.5.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "roomRuntime" }
+androidx-room-compiler-v252 = { module = "androidx.room:room-compiler", version.ref = "roomCompiler" }
+androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "roomRuntime" }
+androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomRuntime" }
 coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coilCompose" }
 converter-gson = { module = "com.squareup.retrofit2:converter-gson", version.ref = "converterGson" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -41,6 +48,7 @@ androidx-storage = { group = "androidx.test.services", name = "storage", version
 logging-interceptor = { module = "com.squareup.okhttp3:logging-interceptor", version.ref = "loggingInterceptor" }
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
 [plugins]
+kotlin-ksp = { id = "com.google.devtools.ksp", version = "1.9.0-1.0.13" }
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 

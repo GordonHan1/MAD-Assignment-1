@@ -26,6 +26,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.it2161.dit99999x.PopCornMovie.data.MovieDetailsResponse
+import com.it2161.dit99999x.PopCornMovie.data.MovieViewerApplication
 import com.it2161.dit99999x.PopCornMovie.ui.components.MovieReview
 import java.text.NumberFormat
 import java.util.Locale
@@ -35,7 +36,11 @@ import java.util.Locale
 fun MovieDetailScreen(
     navController: NavController,
     movieId: Int,
-    viewModel: MovieDetailsViewModel = viewModel()
+    viewModel: MovieDetailsViewModel = viewModel(
+        factory = MovieDetailsViewModelFactory(
+            MovieViewerApplication.getInstance().repository
+        )
+    )
 ) {
     val movieDetails by viewModel.movieDetails.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()

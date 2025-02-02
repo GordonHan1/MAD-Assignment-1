@@ -10,6 +10,8 @@ import android.graphics.BitmapFactory
 import android.util.Base64
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.it2161.dit99999x.PopCornMovie.data.MovieDatabase
+import com.it2161.dit99999x.PopCornMovie.data.MovieRepository
 import com.it2161.dit99999x.PopCornMovie.data.UserProfile
 import com.it2161.dit99999x.PopCornMovie.data.mvBeneathTheSurface
 import com.it2161.dit99999x.PopCornMovie.data.mvCityOfShadowsData
@@ -23,6 +25,18 @@ import org.json.JSONArray
 import java.io.File
 
 class MovieRaterApplication : Application() {
+    lateinit var database: MovieDatabase
+        private set
+
+    val repository: MovieRepository by lazy {
+        database = MovieDatabase.getDatabase(this)
+        MovieRepository(database.movieDao(), this)
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        repository
+    }
 
     var userProfile: UserProfile? = null
         get() = field

@@ -20,7 +20,7 @@ sealed class BottomNavItem(
     val unselectedIcon: Int
 ) {
     object Home : BottomNavItem("LandingPage", R.drawable.home_opaque, R.drawable.home)
-    object Middle : BottomNavItem("MiddleScreenRoute", R.drawable.home, R.drawable.home)
+    object Middle : BottomNavItem("MiddleScreenRoute", R.drawable.star_filled, R.drawable.star)
     object Profile : BottomNavItem("ProfileScreen", R.drawable.user_opaque, R.drawable.user)
 }
 
@@ -44,7 +44,6 @@ fun BottomAppBar(navController: NavController) {
                 selected = currentRoute == item.route,
                 onClick = {
                     navController.navigate(item.route) {
-                        // Avoid multiple copies of the same destination
                         popUpTo(navController.graph.startDestinationId)
                         launchSingleTop = true
                     }

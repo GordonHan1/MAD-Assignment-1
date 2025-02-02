@@ -2,14 +2,16 @@ package com.it2161.dit99999x.PopCornMovie.ui.components
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.it2161.dit99999x.PopCornMovie.MovieRaterApplication
 import com.it2161.dit99999x.PopCornMovie.data.MovieDetailsResponse
 import com.it2161.dit99999x.PopCornMovie.data.MovieRepository
+import com.it2161.dit99999x.PopCornMovie.data.MovieViewerApplication
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class MovieDetailsViewModel(
-    private val repository: MovieRepository = MovieRepository() // or inject it
+    private val repository: MovieRepository = MovieViewerApplication.getInstance().repository
 ) : ViewModel() {
 
     private val _movieDetails = MutableStateFlow<MovieDetailsResponse?>(null)
@@ -25,17 +27,17 @@ class MovieDetailsViewModel(
         viewModelScope.launch {
             try {
                 _isLoading.value = true
+                _errorMessage.value = null
                 val details = repository.getMovieDetails(movieId)
                 _movieDetails.value = details
-                // Fetch reviews after movie details
-                fetchMovieReviews(movieId)
             } catch (e: Exception) {
-                _errorMessage.value = e.message
+                _errorMessage.value = "Failed to load movie details: ${e.message}"
             } finally {
                 _isLoading.value = false
             }
         }
     }
+
 
     private val _reviews = MutableStateFlow<List<MovieReview>>(emptyList())
     val reviews = _reviews.asStateFlow()
