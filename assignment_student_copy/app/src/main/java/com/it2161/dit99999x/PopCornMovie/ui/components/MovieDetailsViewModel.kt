@@ -3,6 +3,7 @@ package com.it2161.dit99999x.PopCornMovie.ui.components
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.it2161.dit99999x.PopCornMovie.MovieRaterApplication
+import com.it2161.dit99999x.PopCornMovie.data.Movie
 import com.it2161.dit99999x.PopCornMovie.data.MovieDetailsResponse
 import com.it2161.dit99999x.PopCornMovie.data.MovieRepository
 import com.it2161.dit99999x.PopCornMovie.data.MovieViewerApplication
@@ -23,6 +24,9 @@ class MovieDetailsViewModel(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage = _errorMessage.asStateFlow()
 
+    private val _similarMovies = MutableStateFlow<List<Movie>>(emptyList())
+    val similarMovies = _similarMovies.asStateFlow()
+
     fun fetchMovieDetails(movieId: Int) {
         viewModelScope.launch {
             try {
@@ -34,6 +38,17 @@ class MovieDetailsViewModel(
                 _errorMessage.value = "Failed to load movie details: ${e.message}"
             } finally {
                 _isLoading.value = false
+            }
+        }
+    }
+
+    fun fetchSimilarMovies(movieId: Int) {
+        viewModelScope.launch {
+            try {
+                val response = repository.getSimilarMovies(movieId)
+                _similarMovies.value = response.results
+            } catch (e: Exception) {
+                _similarMovies.value = emptyList()
             }
         }
     }

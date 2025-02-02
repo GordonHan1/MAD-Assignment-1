@@ -2,7 +2,10 @@ package com.it2161.dit99999x.PopCornMovie.ui.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +28,7 @@ import coil.request.ImageRequest
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.it2161.dit99999x.PopCornMovie.data.Movie
 import com.it2161.dit99999x.PopCornMovie.data.MovieDetailsResponse
 import com.it2161.dit99999x.PopCornMovie.data.MovieViewerApplication
 import com.it2161.dit99999x.PopCornMovie.ui.components.MovieReview
@@ -51,6 +55,7 @@ fun MovieDetailScreen(
 
     LaunchedEffect(movieId) {
         viewModel.fetchMovieDetails(movieId)
+        viewModel.fetchSimilarMovies(movieId)
     }
 
     Scaffold(
@@ -85,11 +90,15 @@ fun MovieDetailScreen(
                     )
                 }
                 movieDetails != null -> {
+                    val similarMovies by viewModel.similarMovies.collectAsState()
+
                     MovieDetailsContent(
                         details = movieDetails!!,
                         reviews = reviews,
                         isLoadingReviews = isLoadingReviews,
-                        reviewsError = reviewsError
+                        reviewsError = reviewsError,
+                        similarMovies = similarMovies,
+                        navController = navController
                     )
                 }
             }
@@ -98,11 +107,59 @@ fun MovieDetailScreen(
 }
 
 @Composable
+fun SimilarMoviesSection(movies: List<Movie>, navController: NavController) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Similar Movies",
+            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+            modifier = Modifier.padding(start = 16.dp, top = 16.dp)
+        )
+
+        LazyRow(modifier = Modifier.padding(top = 8.dp, start = 16.dp, end = 16.dp)) {
+            items(movies) { movie ->
+                MovieCard(movie, navController)
+            }
+        }
+    }
+}
+
+@Composable
+fun MovieCard(movie: Movie, navController: NavController) {
+    Column(
+        modifier = Modifier
+            .width(120.dp)
+            .padding(end = 8.dp)
+            .clickable {
+                navController.navigate("movie_detail_screen/${movie.id}")
+            },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        AsyncImage(
+            model = "https://image.tmdb.org/t/p/w185${movie.poster_path}",
+            contentDescription = movie.title,
+            modifier = Modifier
+                .size(120.dp)
+                .clip(RoundedCornerShape(8.dp)),
+            contentScale = ContentScale.Crop
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = movie.title,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 2,
+            modifier = Modifier.width(120.dp)
+        )
+    }
+}
+
+@Composable
 fun MovieDetailsContent(
     details: MovieDetailsResponse,
     reviews: List<MovieReview>,
     isLoadingReviews: Boolean,
-    reviewsError: String?
+    reviewsError: String?,
+    similarMovies: List<Movie>,
+    navController: NavController
 ) {
     val formattedRevenue = NumberFormat.getNumberInstance(Locale.US).format(details.revenue)
 
@@ -158,6 +215,13 @@ fun MovieDetailsContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // **INSERT SIMILAR MOVIES SECTION HERE**
+        if (similarMovies.isNotEmpty()) {
+            SimilarMoviesSection(movies = similarMovies, navController = navController)
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // **Reviews Section**
         Card(
             modifier = Modifier
                 .fillMaxWidth()

@@ -186,5 +186,13 @@ class MovieRepository(
         movieDao.insertMovieDetails(movieEntity)
     }
 
+    suspend fun getSimilarMovies(movieId: Int): MovieResponse {
+        return RetrofitClient.instance.getSimilarMovies(
+            movieId = movieId,
+            apiKey = "24f4591904aa6cb41814de8604cb5e04"
+        )
+    }
+
+
 
 }
