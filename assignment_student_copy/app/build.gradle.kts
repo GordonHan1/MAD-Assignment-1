@@ -51,7 +51,9 @@ android {
 }
 
 dependencies {
+    implementation (libs.androidx.material.icons.extended)
     implementation (libs.androidx.room.runtime)
+    implementation(libs.androidx.ui.test.android)
     ksp (libs.androidx.room.compiler.v252)
     implementation (libs.androidx.room.ktx)
     implementation(libs.androidx.core.ktx)

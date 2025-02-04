@@ -1,7 +1,6 @@
 // LandingScreen.kt
 package com.it2161.dit99999x.PopCornMovie.ui.components
 
-import com.it2161.dit99999x.PopCornMovie.data.MovieRepository
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -16,10 +15,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -42,10 +44,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.it2161.dit99999x.PopCornMovie.MovieRaterApplication
 import com.it2161.dit99999x.PopCornMovie.R
 import com.it2161.dit99999x.PopCornMovie.data.MovieViewerApplication
 import kotlinx.coroutines.delay
@@ -65,6 +65,7 @@ fun LandingPage(
     )
 ) {
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    var isDarkMode by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var isSearching by remember { mutableStateOf(false) }
     // Observe the view model’s state
@@ -103,8 +104,8 @@ fun LandingPage(
 
 
 
-    Scaffold(Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        // topBar and bottomBar as before
+    Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
                 modifier = Modifier
@@ -116,6 +117,19 @@ fun LandingPage(
                         contentDescription = "TMDb Logo",
                         modifier = Modifier.size(150.dp) // Adjust size as needed
                     )
+                },
+                // Add the dark mode toggle in the actions slot.
+                actions = {
+                    IconButton(onClick = { isDarkMode = !isDarkMode }) {
+                        val iconRes = if (isDarkMode) R.drawable.baseline_dark_mode_24 else R.drawable.baseline_light_mode_24
+                        val contentDesc = if (isDarkMode) "Disable Dark Mode" else "Enable Dark Mode"
+
+                        Icon(
+                            painter = painterResource(id = iconRes),
+                            contentDescription = contentDesc,
+                            tint = Color.White
+                        )
+                    }
                 },
                 scrollBehavior = scrollBehavior,
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -246,23 +260,28 @@ fun LandingPage(
                     }
                 }
 
-                item {
-                    PaginationBar(
-                        currentPage = currentPage,
-                        totalPages = totalPages,
-                        onPageChange = { newPage ->
-                            viewModel.setPage(newPage)
-                            // Also if you want to scroll to top:
-                            // Make sure to do this inside a coroutine:
-                            // rememberCoroutineScope().launch {
-                            //     lazyListState.animateScrollToItem(0)
-                            // }
-                        }
-                    )
+                if (isOnline.value) {
+                    item {
+                        PaginationBar(
+                            currentPage = currentPage,
+                            totalPages = totalPages,
+                            onPageChange = { newPage ->
+                                viewModel.setPage(newPage)
+                            }
+                        )
+                    }
                 }
 
                 // Movie items
-                items(movies.take(if (viewModel.isOffline) 10 else movies.size)) { movie ->
+                items(
+                    items = movies,
+                    key = { it.id }
+                ) { movie ->
+                    LaunchedEffect(movie.id) {
+                        // Cache the movie when it becomes visible
+                        viewModel.onMovieVisible(movie)
+                    }
+
                     MovieItem(
                         movieId = movie.id,
                         imageFileName = movie.poster_path ?: "",
@@ -274,15 +293,17 @@ fun LandingPage(
                     )
                 }
 
-                // Pagination bar
-                item {
-                    PaginationBar(
-                        currentPage = currentPage,
-                        totalPages = if (viewModel.isOffline) (viewModel.allMoviesOffline.size / 10) + 1 else totalPages,
-                        onPageChange = { newPage ->
-                            viewModel.setPage(newPage)
-                        }
-                    )
+        // Pagination bar
+                if (isOnline.value) {
+                    item {
+                        PaginationBar(
+                            currentPage = currentPage,
+                            totalPages = totalPages,
+                            onPageChange = { newPage ->
+                                viewModel.setPage(newPage)
+                            }
+                        )
+                    }
                 }
             }
         }

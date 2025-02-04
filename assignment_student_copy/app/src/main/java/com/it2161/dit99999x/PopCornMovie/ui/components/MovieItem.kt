@@ -82,7 +82,7 @@ fun MovieItem(
                 Image(
                     painter = rememberAsyncImagePainter(
                         ImageRequest.Builder(LocalContext.current)
-                            .data("https://image.tmdb.org/t/p/w500$imageFileName")
+                            .data(getValidImageUrl(imageFileName))
                             .crossfade(true)
                             .build()
                     ),
@@ -90,6 +90,7 @@ fun MovieItem(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
+
 
                 // Circular Rating Indicator
                 Box(
@@ -181,5 +182,13 @@ fun MovieItem(
                 )
             }
         }
+    }
+}
+
+fun getValidImageUrl(imagePath: String?): String {
+    return if (!imagePath.isNullOrEmpty()) {
+        "https://image.tmdb.org/t/p/w500$imagePath"
+    } else {
+        "file:///android_asset/default_movie_poster.jpg" // Use a local placeholder image
     }
 }

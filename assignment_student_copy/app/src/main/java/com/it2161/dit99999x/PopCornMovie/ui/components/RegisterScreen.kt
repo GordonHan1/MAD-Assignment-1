@@ -11,12 +11,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import com.it2161.dit99999x.PopCornMovie.R
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -28,6 +32,9 @@ fun RegistrationScreen(navController: NavController) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    // Separate state variables for toggling password visibility
+    var passwordVisible by remember { mutableStateOf(false) }
+    var confirmPasswordVisible by remember { mutableStateOf(false) }
     var email by remember { mutableStateOf("") }
     var receiveUpdates by remember { mutableStateOf(false) }
 
@@ -63,16 +70,54 @@ fun RegistrationScreen(navController: NavController) {
                 value = password,
                 onValueChange = { password = it },
                 label = { Text("Password") },
-                visualTransformation = PasswordVisualTransformation(),
+                singleLine = true,
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(
+                            painter = painterResource(
+                                id = if (passwordVisible)
+                                    R.drawable.ic_visibility  // replace with your "visible" icon resource
+                                else
+                                    R.drawable.ic_visibility_off  // replace with your "hidden" icon resource
+                            ),
+                            contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                            modifier = Modifier
+                                .clickable { passwordVisible = !passwordVisible }
+                                .size(24.dp)
+                                .alpha(0.7f),
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                },
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Confirm Password field
+            // Confirm Password Field
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it },
                 label = { Text("Confirm Password") },
-                visualTransformation = PasswordVisualTransformation(),
+                singleLine = true,
+                visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                        Icon(
+                            painter = painterResource(
+                                id = if (confirmPasswordVisible)
+                                    R.drawable.ic_visibility
+                                else
+                                    R.drawable.ic_visibility_off
+                            ),
+                            contentDescription = if (confirmPasswordVisible) "Hide password" else "Show password",
+                            modifier = Modifier
+                                .clickable { passwordVisible = !passwordVisible }
+                                .size(24.dp)
+                                .alpha(0.7f),
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                },
                 modifier = Modifier.fillMaxWidth()
             )
 

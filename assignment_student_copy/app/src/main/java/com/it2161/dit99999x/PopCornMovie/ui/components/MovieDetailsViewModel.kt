@@ -21,6 +21,15 @@ class MovieDetailsViewModel(
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
 
+    private val _isOffline = MutableStateFlow(false)
+    val isOffline = _isOffline.asStateFlow()
+    private val _isFavorite = MutableStateFlow(false)
+    val isFavorite = _isFavorite.asStateFlow()
+
+    init {
+        _isOffline.value = !repository.isNetworkAvailable()
+    }
+
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage = _errorMessage.asStateFlow()
 
@@ -63,7 +72,7 @@ class MovieDetailsViewModel(
     private val _reviewsError = MutableStateFlow<String?>(null)
     val reviewsError = _reviewsError.asStateFlow()
 
-    private fun fetchMovieReviews(movieId: Int) {
+    fun fetchMovieReviews(movieId: Int) {
         viewModelScope.launch {
             try {
                 _isLoadingReviews.value = true
@@ -75,6 +84,22 @@ class MovieDetailsViewModel(
             } finally {
                 _isLoadingReviews.value = false
             }
+        }
+    }
+    fun checkFavoriteStatus(movieId: Int) {
+        viewModelScope.launch {
+            _isFavorite.value = repository.isFavorite(movieId)
+        }
+    }
+
+    fun toggleFavorite(movie: Movie) {
+        viewModelScope.launch {
+            if (_isFavorite.value) {
+                repository.removeFromFavorites(movie.id)
+            } else {
+                repository.addToFavorites(movie)
+            }
+            _isFavorite.value = !_isFavorite.value
         }
     }
 }

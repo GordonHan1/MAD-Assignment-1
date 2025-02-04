@@ -19,6 +19,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.it2161.dit99999x.PopCornMovie.ui.components.FavoritesScreen
 import com.it2161.dit99999x.PopCornMovie.ui.components.LandingPage
 import com.it2161.dit99999x.PopCornMovie.ui.components.LoginScreen
 import com.it2161.dit99999x.PopCornMovie.ui.components.RegistrationScreen
@@ -60,6 +61,9 @@ fun MainScreen(isLoggedIn: Boolean) {
         }
         composable("ProfileScreen") {
             ProfileScreen(navController)
+        }
+        composable("favorites") {
+            FavoritesScreen(navController = navController)
         }
         composable(
             route = "movie_detail_screen/{movieId}",

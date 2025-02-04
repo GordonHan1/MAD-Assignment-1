@@ -20,7 +20,7 @@ sealed class BottomNavItem(
     val unselectedIcon: Int
 ) {
     object Home : BottomNavItem("LandingPage", R.drawable.home_opaque, R.drawable.home)
-    object Middle : BottomNavItem("MiddleScreenRoute", R.drawable.star_filled, R.drawable.star)
+    object Middle : BottomNavItem("favorites", R.drawable.star_filled, R.drawable.star)
     object Profile : BottomNavItem("ProfileScreen", R.drawable.user_opaque, R.drawable.user)
 }
 

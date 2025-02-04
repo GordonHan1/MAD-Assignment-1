@@ -10,8 +10,9 @@ data class MovieEntity(
     val overview: String,
     val posterPath: String?,
     val releaseDate: String,
-    val runtime: Int?, // Add runtime
-    val genres: String?, // Store genres as a comma-separated string
+    val page: Int, // Add page number to entity
+    val runtime: Int,
+    val genres: String?,
     val voteAverage: Float,
     val revenue: Long
 )

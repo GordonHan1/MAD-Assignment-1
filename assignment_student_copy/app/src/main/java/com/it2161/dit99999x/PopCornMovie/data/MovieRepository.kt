@@ -5,6 +5,7 @@ import android.app.Application
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.util.Log
 import com.it2161.dit99999x.PopCornMovie.ui.components.MovieListType
 import com.it2161.dit99999x.PopCornMovie.ui.components.MovieReviewsResponse
 
@@ -50,12 +51,14 @@ class MovieRepository(
 
     suspend fun getMoviesByType(type: MovieListType, page: Int): MovieResponse {
         return if (isNetworkAvailable()) {
-            // Fetch movies from API
-            val response = when (type) {
-                MovieListType.POPULAR -> RetrofitClient.instance.getPopularMovies(
-                    apiKey = "24f4591904aa6cb41814de8604cb5e04",
-                    page = page
-                )
+            // Fetch from API as before
+            try {
+                // Fetch from API as before
+                val response = when (type) {
+                    MovieListType.POPULAR -> RetrofitClient.instance.getPopularMovies(
+                        apiKey = "24f4591904aa6cb41814de8604cb5e04",
+                        page = page
+                    )
                 MovieListType.TOP_RATED -> RetrofitClient.instance.getTopRatedMovies(
                     apiKey = "24f4591904aa6cb41814de8604cb5e04",
                     page = page
@@ -71,32 +74,31 @@ class MovieRepository(
             }
 
             // Convert API response to entities and store in database
-            val movieEntities = response.results.map { movie ->
-                // Fetch additional details for each movie
-                val details = try {
-                    RetrofitClient.instance.getMovieDetails(movie.id, apiKey = "24f4591904aa6cb41814de8604cb5e04")
-                } catch (e: Exception) {
-                    null // If API call fails, fallback to defaults
+                val movieEntities = response.results.map { movie ->
+                    MovieEntity(
+                        id = movie.id,
+                        title = movie.title,
+                        overview = movie.overview,
+                        posterPath = movie.poster_path,
+                        releaseDate = movie.release_date,
+                        runtime = 0, // We'll update this later when details are fetched
+                        genres = "",
+                        voteAverage = movie.vote_average ?: 0.0F,
+                        revenue = 0L,
+                        page = page
+                    )
                 }
 
-                MovieEntity(
-                    id = movie.id,
-                    title = movie.title,
-                    overview = movie.overview,
-                    posterPath = movie.poster_path,
-                    releaseDate = movie.release_date,
-                    runtime = details?.runtime ?: 0, // Default to 0 if API call fails
-                    genres = details?.genres?.joinToString { it.name } ?: "Unknown", // Default if API fails
-                    voteAverage = details?.voteAverage ?: 0.0F, // Default to 0.0 if missing
-                    revenue = details?.revenue ?: 0L // Default to 0 if missing
-                )
-            }
-            movieDao.insertMovies(movieEntities)
+                if (movieEntities.isNotEmpty()) {
+                    movieDao.insertMovies(movieEntities)
+                    Log.d("MovieData", "Stored ${movieEntities.size} movies in database")
+                }
 
-            response
-        } else {
-            // If offline, fetch from database
-            val cachedMovies = movieDao.getAllMovies()
+                // Return the unfiltered response
+                response
+        } catch (e: Exception) {
+            // If API call fails, fall back to database
+            val cachedMovies = movieDao.getMoviesForPage(page)
             MovieResponse(
                 page = page,
                 results = cachedMovies.map { entity ->
@@ -104,34 +106,54 @@ class MovieRepository(
                         id = entity.id,
                         title = entity.title,
                         overview = entity.overview,
-                        poster_path = entity.posterPath.toString(),
+                        poster_path = entity.posterPath ?: "",
                         release_date = entity.releaseDate,
-                        vote_average = entity.voteAverage // Use stored value instead of default
+                        vote_average = entity.voteAverage
                     )
                 },
-                total_pages = 1 // Offline mode shows cached movies only
+                total_pages = movieDao.getMaxPage()
+            )
+        }
+    } else {
+            // If offline, fetch from database
+            val cachedMovies = movieDao.getMoviesForPage(page)
+            MovieResponse(
+                page = page,
+                results = cachedMovies.map { entity ->
+                    Movie(
+                        id = entity.id,
+                        title = entity.title,
+                        overview = entity.overview,
+                        poster_path = entity.posterPath ?: "",
+                        release_date = entity.releaseDate,
+                        vote_average = entity.voteAverage
+                    )
+                },
+                total_pages = movieDao.getMaxPage() // Get actual number of cached pages
             )
         }
     }
-
-
     suspend fun getMovieDetails(movieId: Int): MovieDetailsResponse {
         return if (isNetworkAvailable()) {
             val details = RetrofitClient.instance.getMovieDetails(movieId, apiKey = "24f4591904aa6cb41814de8604cb5e04")
 
-            // Ensure correct handling of ID
-            val movieEntity = MovieEntity(
-                id = movieId,  // Explicitly setting the movie ID
-                title = details.title,
-                overview = details.overview,
-                posterPath = details.poster_path,
-                releaseDate = details.releaseDate,
-                runtime = details.runtime,
-                genres = details.genres.joinToString { it.name },
-                voteAverage = details.voteAverage,
-                revenue = details.revenue
-            )
-            movieDao.insertMovieDetails(movieEntity)
+            val movieEntity = details.runtime?.let {
+                MovieEntity(
+                    id = movieId,
+                    title = details.title,
+                    overview = details.overview,
+                    posterPath = details.poster_path,
+                    releaseDate = details.releaseDate,
+                    runtime = it,
+                    genres = details.genres.joinToString { it.name },
+                    voteAverage = details.voteAverage,
+                    revenue = details.revenue,
+                    page = movieDao.getMoviePage(movieId) ?: 1 // Get existing page or default to 1
+                )
+            }
+            if (movieEntity != null) {
+                movieDao.insertMovieDetails(movieEntity)
+            }
 
             details
         } else {
@@ -173,7 +195,7 @@ class MovieRepository(
 
     suspend fun insertMovieDetails(details: MovieDetailsResponse, movieId: Int) {
         val movieEntity = MovieEntity(
-            id = movieId,  // Explicitly pass the movie ID
+            id = movieId,
             title = details.title,
             overview = details.overview,
             posterPath = details.poster_path ?: "",
@@ -181,7 +203,8 @@ class MovieRepository(
             runtime = details.runtime ?: 0,
             genres = details.genres.joinToString { it.name },
             voteAverage = details.voteAverage ?: 0.0F,
-            revenue = details.revenue ?: 0L
+            revenue = details.revenue ?: 0L,
+            page = movieDao.getMoviePage(movieId) ?: 1 // Get existing page or default to 1
         )
         movieDao.insertMovieDetails(movieEntity)
     }
@@ -193,6 +216,67 @@ class MovieRepository(
         )
     }
 
+    suspend fun cacheMovieWhenVisible(movie: Movie, page: Int) {
+        // Only cache if we don't already have this movie
+        if (movieDao.getMovieDetails(movie.id) == null) {
+            // Fetch additional details only when movie becomes visible
+            val details = try {
+                RetrofitClient.instance.getMovieDetails(
+                    movie.id,
+                    apiKey = "24f4591904aa6cb41814de8604cb5e04"
+                )
+            } catch (e: Exception) {
+                null
+            }
+
+            val movieEntity = MovieEntity(
+                id = movie.id,
+                title = movie.title,
+                overview = movie.overview,
+                posterPath = movie.poster_path,
+                releaseDate = movie.release_date,
+                page = page, // Store which page this movie belongs to
+                runtime = details?.runtime ?: 0,
+                genres = details?.genres?.joinToString { it.name } ?: "Unknown",
+                voteAverage = details?.voteAverage ?: 0.0F,
+                revenue = details?.revenue ?: 0L
+            )
+            movieDao.insertMovieDetails(movieEntity)
+        }
+    }
 
 
+    suspend fun getFavorites(): List<Movie> {
+        return movieDao.getAllFavorites().map { entity ->
+            Movie(
+                id = entity.movieId,
+                title = entity.title,
+                overview = entity.overview,
+                poster_path = entity.posterPath ?: "",
+                release_date = entity.releaseDate,
+                vote_average = entity.voteAverage
+            )
+        }
+    }
+
+    suspend fun addToFavorites(movie: Movie) {
+        movieDao.insertFavorite(
+            FavoriteEntity(
+                movieId = movie.id,
+                title = movie.title,
+                overview = movie.overview,
+                posterPath = movie.poster_path,
+                releaseDate = movie.release_date,
+                voteAverage = movie.vote_average ?: 0f
+            )
+        )
+    }
+
+    suspend fun removeFromFavorites(movieId: Int) {
+        movieDao.removeFavorite(movieId)
+    }
+
+    suspend fun isFavorite(movieId: Int): Boolean {
+        return movieDao.isFavorite(movieId)
+    }
 }

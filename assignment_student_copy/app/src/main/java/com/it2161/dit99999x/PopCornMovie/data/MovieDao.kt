@@ -22,4 +22,25 @@ interface MovieDao {
 
     @Query("DELETE FROM movies")
     suspend fun clearMovies()
+
+    @Query("SELECT * FROM movies WHERE page = :page")
+    suspend fun getMoviesForPage(page: Int): List<MovieEntity>
+
+    @Query("SELECT MAX(page) FROM movies")
+    suspend fun getMaxPage(): Int
+
+    @Query("SELECT page FROM movies WHERE id = :movieId")
+    suspend fun getMoviePage(movieId: Int): Int?
+
+    @Query("SELECT * FROM favorites")
+    suspend fun getAllFavorites(): List<FavoriteEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFavorite(favorite: FavoriteEntity)
+
+    @Query("DELETE FROM favorites WHERE movieId = :movieId")
+    suspend fun removeFavorite(movieId: Int)
+
+    @Query("SELECT EXISTS(SELECT 1 FROM favorites WHERE movieId = :movieId)")
+    suspend fun isFavorite(movieId: Int): Boolean
 }

@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
@@ -28,6 +29,7 @@ import coil.request.ImageRequest
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.it2161.dit99999x.PopCornMovie.R
 import com.it2161.dit99999x.PopCornMovie.data.Movie
 import com.it2161.dit99999x.PopCornMovie.data.MovieDetailsResponse
 import com.it2161.dit99999x.PopCornMovie.data.MovieViewerApplication
@@ -52,10 +54,12 @@ fun MovieDetailScreen(
     val reviews by viewModel.reviews.collectAsState()
     val isLoadingReviews by viewModel.isLoadingReviews.collectAsState()
     val reviewsError by viewModel.reviewsError.collectAsState()
-
+    val isOffline by viewModel.isOffline.collectAsState()
     LaunchedEffect(movieId) {
         viewModel.fetchMovieDetails(movieId)
         viewModel.fetchSimilarMovies(movieId)
+        viewModel.fetchMovieReviews(movieId)
+        viewModel.checkFavoriteStatus(movieId) // <--- Add this line to fetch reviews
     }
 
     Scaffold(
@@ -67,6 +71,36 @@ fun MovieDetailScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back"
+                        )
+                    }
+                },
+                actions = {
+                    // Favorites button
+                    IconButton(
+                        onClick = {
+                            movieDetails?.let { details ->
+                                viewModel.toggleFavorite(
+                                    Movie(
+                                        id = movieId,
+                                        title = details.title,
+                                        overview = details.overview,
+                                        poster_path = details.poster_path,
+                                        release_date = details.releaseDate ?: "",
+                                        vote_average = details.voteAverage
+                                    )
+                                )
+                            }
+                        }
+                    ) {
+                        Icon(
+                            painter = painterResource(
+                                id = if (viewModel.isFavorite.collectAsState().value)
+                                    R.drawable.star_filled
+                                else
+                                    R.drawable.star
+                            ),
+                            contentDescription = "Toggle Favorite",
+                            modifier = Modifier.size(26.dp) // Adjust the dp value as needed
                         )
                     }
                 }
@@ -82,6 +116,7 @@ fun MovieDetailScreen(
                 isLoading -> {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 }
+
                 errorMessage != null -> {
                     Text(
                         text = "Error: $errorMessage",
@@ -89,15 +124,16 @@ fun MovieDetailScreen(
                         color = MaterialTheme.colorScheme.error
                     )
                 }
+
                 movieDetails != null -> {
                     val similarMovies by viewModel.similarMovies.collectAsState()
-
                     MovieDetailsContent(
                         details = movieDetails!!,
                         reviews = reviews,
                         isLoadingReviews = isLoadingReviews,
                         reviewsError = reviewsError,
                         similarMovies = similarMovies,
+                        isOffline = isOffline,
                         navController = navController
                     )
                 }
@@ -159,6 +195,7 @@ fun MovieDetailsContent(
     isLoadingReviews: Boolean,
     reviewsError: String?,
     similarMovies: List<Movie>,
+    isOffline: Boolean, // Add isOffline parameter
     navController: NavController
 ) {
     val formattedRevenue = NumberFormat.getNumberInstance(Locale.US).format(details.revenue)
@@ -215,44 +252,56 @@ fun MovieDetailsContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // **INSERT SIMILAR MOVIES SECTION HERE**
-        if (similarMovies.isNotEmpty()) {
-            SimilarMoviesSection(movies = similarMovies, navController = navController)
-            Spacer(modifier = Modifier.height(16.dp))
-        }
+        // **Show message if offline**
+        if (isOffline) {
+            Text(
+                text = "Similar movies and movie reviews are not available offline",
+                color = Color.Red,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier
+                    .padding(16.dp)
+                    .align(Alignment.CenterHorizontally)
+            )
+        } else {
+            // **Display Similar Movies Section when online**
+            if (similarMovies.isNotEmpty()) {
+                SimilarMoviesSection(movies = similarMovies, navController = navController)
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
-        // **Reviews Section**
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            shape = RoundedCornerShape(12.dp),
-            elevation = CardDefaults.cardElevation(8.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Reviews",
-                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
-                )
+            // **Reviews Section**
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(12.dp),
+                elevation = CardDefaults.cardElevation(8.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Reviews",
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
+                    )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                when {
-                    isLoadingReviews -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-                    reviewsError != null -> Text(text = "Error loading reviews: $reviewsError", color = MaterialTheme.colorScheme.error)
-                    reviews.isEmpty() -> Text(text = "No reviews available")
-                    else -> {
-                        reviews.forEachIndexed { index, review ->
-                            if (index > 0) {
-                                Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    when {
+                        isLoadingReviews -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                        reviewsError != null -> Text(text = "Error loading reviews: $reviewsError", color = MaterialTheme.colorScheme.error)
+                        reviews.isEmpty() -> Text(text = "No reviews available")
+                        else -> {
+                            reviews.forEachIndexed { index, review ->
+                                if (index > 0) {
+                                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                                }
+                                ReviewItem(
+                                    author = review.author,
+                                    rating = review.author_details?.rating ?: 0f,
+                                    content = review.content,
+                                    date = review.createdAt,
+                                    avatarPath = review.author_details?.avatar_path
+                                )
                             }
-                            ReviewItem(
-                                author = review.author,
-                                rating = review.author_details?.rating ?: 0f,
-                                content = review.content,
-                                date = review.createdAt,
-                                avatarPath = review.author_details?.avatar_path
-                            )
                         }
                     }
                 }
@@ -260,6 +309,7 @@ fun MovieDetailsContent(
         }
     }
 }
+
 
 @Composable
 fun ReviewItem(
